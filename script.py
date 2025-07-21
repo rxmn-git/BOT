@@ -147,7 +147,8 @@ async def sync_command(interaction: discord.Interaction):
 
     if total_new_ids:
         try:
-            sp.playlist_add_items(playlist_id, list(reversed(new_ids)), position=0)
+            for track_id in reversed(total_new_ids):
+                sp.playlist_add_items(playlist_id, [track_id], position=0)
             logger.info(f"[SPOTIFY] Added from history: {total_new_ids}")
             await interaction.followup.send(f"Added {len(total_new_ids)} new track(s) from message history.")
             
