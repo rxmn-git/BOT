@@ -30,7 +30,8 @@ sp_oauth = SpotifyOAuth(
     client_secret=SPOTIPY_CLIENT_SECRET,
     redirect_uri=SPOTIPY_REDIRECT_URI,
     scope=scope,
-    username=SPOTIFY_USERNAME
+    username=SPOTIFY_USERNAME,
+    cache_path=".spotify_token_cache"
 )
 sp = spotipy.Spotify(auth_manager=sp_oauth)
 logger.info(f"[SPOTIFY] Logged in as: {sp.current_user()['display_name']}")
