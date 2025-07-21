@@ -134,7 +134,7 @@ async def playlist_command(interaction: discord.Interaction):
 @tree.command(name="sync", description="Read past messages and adds the Spotify songs")
 async def sync_command(interaction: discord.Interaction):
     if interaction.channel.id != CHANNEL_ID:
-        return await interaction.response.send_message("This command can only be used in #music-recs.", ephemeral=True, delete_after=5)
+        return await interaction.response.send_message("This command can only be used in #music-recs.", ephemeral=True)
 
     await interaction.response.send_message("Reading previous messages...", delete_after=500)
     existing_ids = get_existing_track_ids(playlist_id)
@@ -153,8 +153,8 @@ async def sync_command(interaction: discord.Interaction):
             
         except Exception as e:
             logger.error(f"[SPOTIFY ERROR] Adding from history: {e}")
-            await interaction.followup.send("Failed to add tracks from history.", delete_after=5)
+            await interaction.followup.send("Failed to add tracks from history.")
     else:
-        await interaction.followup.send("No new tracks found in previous messages.", delete_after=5)
+        await interaction.followup.send("No new tracks found in previous messages.")
 
 bot.run(DISCORD_TOKEN)
