@@ -136,7 +136,7 @@ async def sync_command(interaction: discord.Interaction):
     if interaction.channel.id != CHANNEL_ID:
         return await interaction.response.send_message("This command can only be used in #music-recs.", ephemeral=True, delete_after=5)
 
-    await interaction.response.send_message("Reading previous messages...", delete_after=5)
+    await interaction.response.send_message("Reading previous messages...", delete_after=500)
     existing_ids = get_existing_track_ids(playlist_id)
     total_new_ids = []
 
