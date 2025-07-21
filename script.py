@@ -140,7 +140,7 @@ async def sync_command(interaction: discord.Interaction):
     existing_ids = get_existing_track_ids(playlist_id)
     total_new_ids = []
 
-    async for message in interaction.channel.history(limit=50):
+    async for message in interaction.channel.history(limit=150):
         new_ids = extract_track_ids_from_text(message.content, existing_ids)
         total_new_ids.extend(new_ids)
         existing_ids.update(new_ids)
