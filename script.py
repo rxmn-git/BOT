@@ -117,25 +117,25 @@ async def on_message(message):
 
     if new_ids:
         try:
-            sp.playlist_add_items(playlist_id, new_ids)
+            sp.playlist_add_items(playlist_id, new_ids, position=0)
             logger.info(f"[SPOTIFY] Added from message: {new_ids}")
-            await message.channel.send(f"Added {len(new_ids)} track(s) to the playlist.")
+            await message.channel.send(f"Added {len(new_ids)} track(s).", delete_after=5)
         except Exception as e:
             logger.error(f"[SPOTIFY ERROR] Adding from message: {e}")
-            await message.channel.send("Failed to add track(s) to the playlist.")
+            await message.channel.send("Failed to add track(s).", delete_after=5)
 
 # Slash command: /playlist
-@tree.command(name="playlist", description="Show the link to the Spotify playlist")
+@tree.command(name="playlist", description="Post the link to the Spotify playlist.")
 async def playlist_command(interaction: discord.Interaction):
     await interaction.response.send_message(f"🎧 {playlist_url}")
 
 # Slash command: /sync
-@tree.command(name="sync", description="Scan past messages in this channel and add Spotify links")
+@tree.command(name="sync", description="Read past messages and adds the Spotify songs")
 async def sync_command(interaction: discord.Interaction):
     if interaction.channel.id != CHANNEL_ID:
-        return await interaction.response.send_message("This command can only be used in #music-recs.", ephemeral=True)
+        return await interaction.response.send_message("This command can only be used in #music-recs.", ephemeral=True, delete_after=5)
 
-    await interaction.response.send_message("Scanning previous messages...")
+    await interaction.response.send_message("Reading previous messages...", delete_after=5)
     existing_ids = get_existing_track_ids(playlist_id)
     total_new_ids = []
 
@@ -146,13 +146,13 @@ async def sync_command(interaction: discord.Interaction):
 
     if total_new_ids:
         try:
-            sp.playlist_add_items(playlist_id, total_new_ids)
+            sp.playlist_add_items(playlist_id, list(reversed(new_ids)), position=0)
             logger.info(f"[SPOTIFY] Added from history: {total_new_ids}")
-            await interaction.followup.send(f"Added {len(total_new_ids)} new track(s) from message history.")
+            await interaction.followup.send(f"Added {len(total_new_ids)} new track(s) from message history.", delete_after=5)
         except Exception as e:
             logger.error(f"[SPOTIFY ERROR] Adding from history: {e}")
-            await interaction.followup.send("Failed to add tracks from history.")
+            await interaction.followup.send("Failed to add tracks from history.", delete_after=5)
     else:
-        await interaction.followup.send("No new tracks found in previous messages.")
+        await interaction.followup.send("No new tracks found in previous messages.", delete_after=5)
 
 bot.run(DISCORD_TOKEN)
