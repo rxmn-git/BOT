@@ -1,3 +1,4 @@
+import asyncio
 import os
 import re
 import discord
@@ -148,7 +149,8 @@ async def sync_command(interaction: discord.Interaction):
         try:
             sp.playlist_add_items(playlist_id, list(reversed(new_ids)), position=0)
             logger.info(f"[SPOTIFY] Added from history: {total_new_ids}")
-            await interaction.followup.send(f"Added {len(total_new_ids)} new track(s) from message history.", delete_after=5)
+            await interaction.followup.send(f"Added {len(total_new_ids)} new track(s) from message history.")
+            
         except Exception as e:
             logger.error(f"[SPOTIFY ERROR] Adding from history: {e}")
             await interaction.followup.send("Failed to add tracks from history.", delete_after=5)
