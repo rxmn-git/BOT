@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 # Load .env
 load_dotenv()
 
-# Recrea cookies.txt desde env var para yt_dlp
+# Recreate cookies.txt from env var for yt_dlp
 if os.getenv("YOUTUBE_COOKIES"):
     with open("cookies.txt", "w", encoding="utf-8") as f:
         f.write(os.getenv("YOUTUBE_COOKIES"))
@@ -71,14 +71,13 @@ def get_existing_track_ids(playlist_id):
             break
     return track_ids
 
-SPOTIFY_LINK_REGEX = r'https?://open\.spotify\.com/(?:intl-[a-z]{2}/)?(?P<type>track|album|playlist)/(?P<id>[a-zA-Z0-9]+)'
-YOUTUBE_LINK_REGEX = r'(https?://(?:www\.)?(?:youtube\.com/watch\?v=|youtu\.be/)[\w\-]+)'
+SPOTIFY_LINK_REGEX = r'https?://open\\.spotify\\.com/(?:intl-[a-z]{2}/)?(?P<type>track|album|playlist)/(?P<id>[a-zA-Z0-9]+)'
+YOUTUBE_LINK_REGEX = r'(https?://(?:www\\.)?(?:youtube\\.com/watch\\?v=|youtu\\.be/)[\\w\\-]+)'
 
 def extract_track_ids_from_text(text, existing_ids):
     matches = re.findall(SPOTIFY_LINK_REGEX, text)
     new_ids = []
 
-    # Manejo de enlaces Spotify
     for link_type, spotify_id in matches:
         try:
             if link_type == 'track':
@@ -103,7 +102,6 @@ def extract_track_ids_from_text(text, existing_ids):
         except Exception as e:
             logger.warning(f"[SPOTIFY ERROR] {link_type}:{spotify_id} - {e}")
 
-    # Manejo de enlaces YouTube
     youtube_links = re.findall(YOUTUBE_LINK_REGEX, text)
     for yt_url in youtube_links:
         title = get_youtube_title(yt_url)
@@ -120,7 +118,6 @@ def extract_track_ids_from_text(text, existing_ids):
                 logger.warning(f"[SPOTIFY SEARCH ERROR] {title} - {e}")
 
     return new_ids
-
 
 def get_youtube_title(url: str):
     try:
@@ -151,13 +148,9 @@ def search_spotify_track_by_title(title, existing_ids):
         logger.warning(f"[SPOTIFY SEARCH ERROR] {title} - {e}")
     return None
 
-
-
-
-# Discord bot setup with commands
+# Discord bot setup
 intents = discord.Intents.default()
 intents.message_content = True
-
 bot = commands.Bot(command_prefix='!', intents=intents)
 tree = bot.tree
 
@@ -172,9 +165,37 @@ async def on_message(message):
         return
 
     existing_ids = get_existing_track_ids(playlist_id)
-    new_ids = extract_track_ids_from_text(message.content, set(existing_ids))
+    existing_ids_set = set(existing_ids)
 
-    # Spotify links
+    new_ids = []
+    added_titles = []
+
+    extracted_ids = extract_track_ids_from_text(message.content, existing_ids_set)
+    for tid in extracted_ids:
+        if tid not in existing_ids_set:
+            new_ids.append(tid)
+            try:
+                track = sp.track(tid)
+                added_titles.append(track["name"] + " - " + track["artists"][0]["name"])
+                existing_ids_set.add(tid)
+            except Exception as e:
+                logger.warning(f"[SPOTIFY FETCH ERROR] {tid} - {e}")
+
+    youtube_links = re.findall(YOUTUBE_LINK_REGEX, message.content)
+    for yt_url in youtube_links:
+        title = get_youtube_title(yt_url)
+        if title:
+            track_id = search_spotify_track_by_title(title, existing_ids_set)
+            if track_id and track_id not in existing_ids_set:
+                try:
+                    sp.playlist_add_items(playlist_id, [track_id], position=0)
+                    track = sp.track(track_id)
+                    added_titles.append(track["name"] + " - " + track["artists"][0]["name"])
+                    existing_ids_set.add(track_id)
+                    logger.info(f"[YOUTUBE->SPOTIFY] Added '{title}' as {track_id}")
+                except Exception as e:
+                    logger.error(f"[YOUTUBE ADD ERROR] {title} - {e}")
+
     if new_ids:
         try:
             for tid in reversed(new_ids):
@@ -182,25 +203,12 @@ async def on_message(message):
             logger.info(f"[SPOTIFY] Added from message: {new_ids}")
         except Exception as e:
             logger.error(f"[SPOTIFY ERROR] Adding from message: {e}")
-            await message.channel.send("Failed to add track(s).", delete_after=5)
+            await message.channel.send("Error adding songs.", delete_after=5)
 
-    # YouTube links
-    yt_matches = re.findall(YOUTUBE_LINK_REGEX, message.content)
-    yt_links = [f"https://www.youtube.com/watch?v={vid}" for vid in yt_matches]
+    if added_titles:
+        msg = f"🎵 Added to the playlist:\n" + "\n".join(f"• {t}" for t in added_titles)
+        await message.channel.send(msg, delete_after=5)
 
-    for yt_url in yt_links:
-        title = get_youtube_title(yt_url)
-        if title:
-            track_id = search_spotify_track_by_title(title, set(existing_ids))
-            if track_id:
-                try:
-                    sp.playlist_add_items(playlist_id, [track_id], position=0)
-                    logger.info(f"[YOUTUBE->SPOTIFY] Added '{title}' as {track_id}")
-                    await message.channel.send(f"Added track from YouTube: {title}", delete_after=5)
-                except Exception as e:
-                    logger.error(f"[YOUTUBE ADD ERROR] {title} - {e}")
-
-    # Enforce playlist limit
     all_ids = get_existing_track_ids(playlist_id)
     if len(all_ids) > 64:
         to_remove = all_ids[64:]
@@ -208,16 +216,14 @@ async def on_message(message):
             sp.playlist_remove_all_occurrences_of_items(playlist_id, to_remove)
             logger.info(f"[SPOTIFY] Removed old tracks: {to_remove}")
 
-# Slash command: /playlist
 @tree.command(name="playlist", description="Post the link to the Spotify playlist.")
 async def playlist_command(interaction: discord.Interaction):
     await interaction.response.send_message(f"{playlist_url}")
 
-# Slash command: /sync
 @tree.command(name="sync", description="Read past messages and adds the Spotify songs")
 async def sync_command(interaction: discord.Interaction):
     if interaction.channel.id != CHANNEL_ID:
-        return await interaction.response.send_message("This command can only be used in #music-recs.", ephemeral=True)
+        return await interaction.response.send_message("This command can only be used in this channel.", ephemeral=True)
 
     await interaction.response.send_message("Reading previous messages...")
     existing_ids = set(get_existing_track_ids(playlist_id))
@@ -248,7 +254,6 @@ async def sync_command(interaction: discord.Interaction):
             logger.error(f"[SPOTIFY ERROR] Adding from history: {e}")
             await interaction.followup.send("Failed to add tracks from history.")
 
-        # Enforce limit
         all_ids = get_existing_track_ids(playlist_id)
         if len(all_ids) > 64:
             to_remove = all_ids[64:]
