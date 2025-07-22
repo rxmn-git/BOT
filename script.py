@@ -5,6 +5,7 @@ import discord
 import spotipy
 import logging
 import yt_dlp
+from yt_dlp import YoutubeDL
 from dotenv import load_dotenv
 from spotipy.oauth2 import SpotifyOAuth
 from discord.ext import commands
@@ -16,6 +17,11 @@ logger = logging.getLogger(__name__)
 
 # Load .env
 load_dotenv()
+
+# Recrea cookies.txt desde env var para yt_dlp
+if os.getenv("YOUTUBE_COOKIES"):
+    with open("cookies.txt", "w", encoding="utf-8") as f:
+        f.write(os.getenv("YOUTUBE_COOKIES"))
 
 DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
 SPOTIPY_CLIENT_ID = os.getenv('SPOTIPY_CLIENT_ID')
@@ -66,16 +72,18 @@ def get_existing_track_ids(playlist_id):
     return track_ids
 
 SPOTIFY_LINK_REGEX = r'https?://open\.spotify\.com/(?:intl-[a-z]{2}/)?(?P<type>track|album|playlist)/(?P<id>[a-zA-Z0-9]+)'
-YOUTUBE_LINK_REGEX = r'https?://(?:www\.)?(?:youtube\.com/watch\?v=|youtu\.be/)([^\s&]+)'
+YOUTUBE_LINK_REGEX = r'(https?://(?:www\.)?(?:youtube\.com/watch\?v=|youtu\.be/)[\w\-]+)'
 
 def extract_track_ids_from_text(text, existing_ids):
     matches = re.findall(SPOTIFY_LINK_REGEX, text)
     new_ids = []
 
+    # Manejo de enlaces Spotify
     for link_type, spotify_id in matches:
         try:
-            if link_type == 'track' and spotify_id not in existing_ids:
-                new_ids.append(spotify_id)
+            if link_type == 'track':
+                if spotify_id not in existing_ids:
+                    new_ids.append(spotify_id)
             elif link_type == 'album':
                 album_tracks = sp.album_tracks(spotify_id)['items']
                 for track in album_tracks:
@@ -91,18 +99,40 @@ def extract_track_ids_from_text(text, existing_ids):
                             tid = track['id']
                             if tid and tid not in existing_ids:
                                 new_ids.append(tid)
-                    if results['next']:
-                        results = sp.next(results)
-                    else:
-                        break
+                    results = sp.next(results) if results['next'] else None
         except Exception as e:
             logger.warning(f"[SPOTIFY ERROR] {link_type}:{spotify_id} - {e}")
 
+    # Manejo de enlaces YouTube
+    youtube_links = re.findall(YOUTUBE_LINK_REGEX, text)
+    for yt_url in youtube_links:
+        title = get_youtube_title(yt_url)
+        if title:
+            try:
+                results = sp.search(q=title, type='track', limit=1)
+                items = results.get('tracks', {}).get('items', [])
+                if items:
+                    track_id = items[0]['id']
+                    if track_id and track_id not in existing_ids:
+                        new_ids.append(track_id)
+                        logger.info(f"[YOUTUBE->SPOTIFY] Matched '{title}' to {track_id}")
+            except Exception as e:
+                logger.warning(f"[SPOTIFY SEARCH ERROR] {title} - {e}")
+
     return new_ids
 
-def extract_youtube_title(url):
+
+def get_youtube_title(url: str):
     try:
-        with yt_dlp.YoutubeDL({'quiet': True}) as ydl:
+        ydl_opts = {
+            'quiet': True,
+            'skip_download': True,
+            'extract_flat': 'in_playlist',
+        }
+        if os.path.exists("cookies.txt"):
+            ydl_opts['cookies'] = 'cookies.txt'
+
+        with YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
             return info.get('title')
     except Exception as e:
@@ -120,6 +150,9 @@ def search_spotify_track_by_title(title, existing_ids):
     except Exception as e:
         logger.warning(f"[SPOTIFY SEARCH ERROR] {title} - {e}")
     return None
+
+
+
 
 # Discord bot setup with commands
 intents = discord.Intents.default()
