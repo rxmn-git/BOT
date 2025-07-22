@@ -189,7 +189,7 @@ async def on_message(message):
     yt_links = [f"https://www.youtube.com/watch?v={vid}" for vid in yt_matches]
 
     for yt_url in yt_links:
-        title = extract_youtube_title(yt_url)
+        title = get_youtube_title(yt_url)
         if title:
             track_id = search_spotify_track_by_title(title, set(existing_ids))
             if track_id:
@@ -202,8 +202,8 @@ async def on_message(message):
 
     # Enforce playlist limit
     all_ids = get_existing_track_ids(playlist_id)
-    if len(all_ids) > 128:
-        to_remove = all_ids[128:]
+    if len(all_ids) > 63:
+        to_remove = all_ids[63:]
         if to_remove:
             sp.playlist_remove_all_occurrences_of_items(playlist_id, to_remove)
             logger.info(f"[SPOTIFY] Removed old tracks: {to_remove}")
@@ -232,7 +232,7 @@ async def sync_command(interaction: discord.Interaction):
         yt_links = [f"https://www.youtube.com/watch?v={vid}" for vid in yt_matches]
 
         for yt_url in yt_links:
-            title = extract_youtube_title(yt_url)
+            title = get_youtube_title(yt_url)
             if title:
                 track_id = search_spotify_track_by_title(title, existing_ids)
                 if track_id:
@@ -250,8 +250,8 @@ async def sync_command(interaction: discord.Interaction):
 
         # Enforce limit
         all_ids = get_existing_track_ids(playlist_id)
-        if len(all_ids) > 128:
-            to_remove = all_ids[128:]
+        if len(all_ids) > 63:
+            to_remove = all_ids[63:]
             if to_remove:
                 sp.playlist_remove_all_occurrences_of_items(playlist_id, to_remove)
                 logger.info(f"[SPOTIFY] Removed old tracks: {to_remove}")
