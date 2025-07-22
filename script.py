@@ -202,8 +202,8 @@ async def on_message(message):
 
     # Enforce playlist limit
     all_ids = get_existing_track_ids(playlist_id)
-    if len(all_ids) > 63:
-        to_remove = all_ids[63:]
+    if len(all_ids) > 64:
+        to_remove = all_ids[64:]
         if to_remove:
             sp.playlist_remove_all_occurrences_of_items(playlist_id, to_remove)
             logger.info(f"[SPOTIFY] Removed old tracks: {to_remove}")
@@ -250,8 +250,8 @@ async def sync_command(interaction: discord.Interaction):
 
         # Enforce limit
         all_ids = get_existing_track_ids(playlist_id)
-        if len(all_ids) > 63:
-            to_remove = all_ids[63:]
+        if len(all_ids) > 64:
+            to_remove = all_ids[64:]
             if to_remove:
                 sp.playlist_remove_all_occurrences_of_items(playlist_id, to_remove)
                 logger.info(f"[SPOTIFY] Removed old tracks: {to_remove}")
