@@ -227,11 +227,23 @@ async def scoreboard_command(interaction: discord.Interaction):
     if not sorted_scores:
         return await interaction.response.send_message("No scores yet.")
 
-    lines = []
-    for rank, (user_id, count) in enumerate(sorted_scores[:10], 1):
-        user = await bot.fetch_user(int(user_id))
-        lines.append(f"#{rank} - {user.name}: {count} song(s)")
+    embed = discord.Embed(
+        title="🏆 Leaderboard for Playlist Contributions",
+        color=discord.Color.blurple()
+    )
 
-    await interaction.response.send_message("🏆 Top Contributors:\n" + "\n".join(lines))
+    description = ""
+    for rank, (user_id, count) in enumerate(sorted_scores[:20], 1):
+        try:
+            user = await bot.fetch_user(int(user_id))
+            description += f"**{rank}.** {user.mention} — `{count}` song(s)\n"
+        except:
+            description += f"**{rank}.** Unknown User — `{count}` song(s)\n"
+
+    embed.description = description
+    embed.set_footer(text="Page 1/1")
+
+    await interaction.response.send_message(embed=embed)
+
 
 bot.run(DISCORD_TOKEN)
