@@ -285,7 +285,7 @@ async def scoreboard_command(interaction: discord.Interaction):
     description = "\n".join(leaderboard_lines)
 
     embed = Embed(
-        title="📊 Recommendations leaderboard",
+        title="📊 Scoreboard!!",
         description=description,
         color=0x5865F2
     )
