@@ -98,18 +98,25 @@ def extract_track_ids_from_text(text, existing_ids):
 
 # Función para mantener la playlist en tamaño máximo 64
 def trim_playlist(playlist_id, max_size=64):
-    results = sp.playlist_items(playlist_id, fields="items.track.id,items.track.uri,total", limit=100)
-    tracks = results['items']
-    total_tracks = results['total']
+    tracks = []
+    results = sp.playlist_items(playlist_id, fields="items.track.uri,next,total", limit=100)
+    tracks.extend(results['items'])
+
+    while results['next']:
+        results = sp.next(results)
+        tracks.extend(results['items'])
+
+    total_tracks = len(tracks)
 
     if total_tracks > max_size:
         to_remove_count = total_tracks - max_size
-        tracks_to_remove = tracks[:to_remove_count]
-
+        # Eliminar las canciones del final de la lista (las más antiguas)
+        tracks_to_remove = tracks[-to_remove_count:]
         uris_to_remove = [item['track']['uri'] for item in tracks_to_remove if item.get('track')]
 
         sp.playlist_remove_all_occurrences_of_items(playlist_id, uris_to_remove)
-        logger.info(f"[SPOTIFY] Removed {to_remove_count} oldest tracks to trim playlist.")
+        logger.info(f"[SPOTIFY] Removed {to_remove_count} oldest tracks (from end) to trim playlist.")
+
 
 # Discord bot setup with commands
 intents = discord.Intents.default()
