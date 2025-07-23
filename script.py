@@ -5,6 +5,7 @@ import discord
 import spotipy
 import logging
 import json
+import asyncpg
 from dotenv import load_dotenv
 from spotipy.oauth2 import SpotifyOAuth
 from discord.ext import commands
@@ -25,18 +26,39 @@ SPOTIFY_USERNAME = os.getenv('SPOTIFY_USERNAME')
 SPOTIFY_PLAYLIST_NAME = os.getenv('SPOTIFY_PLAYLIST_NAME')
 CHANNEL_ID = int(os.getenv('CHANNEL_ID'))
 
-SCOREBOARD_FILE = "scoreboard.json"
+# PostgreSQL
+DATABASE_URL = os.getenv("postgresql://postgres:RlLgrpOOFVCRULMgQqiMhHZtSsMMRVST@shortline.proxy.rlwy.net:25650/railway")
+db_pool = None
 
-# Load scoreboard from file
-if os.path.exists(SCOREBOARD_FILE):
-    with open(SCOREBOARD_FILE, "r") as f:
-        scoreboard = json.load(f)
-else:
-    scoreboard = {}
+async def init_db():
+    global db_pool
+    db_pool = await asyncpg.create_pool(DATABASE_URL)
+    async with db_pool.acquire() as conn:
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS scoreboard (
+                user_id TEXT PRIMARY KEY,
+                count INTEGER NOT NULL
+            );
+        """)
 
-def save_scoreboard():
-    with open(SCOREBOARD_FILE, "w") as f:
-        json.dump(scoreboard, f)
+async def increment_score(user_id: str, amount: int = 1):
+    async with db_pool.acquire() as conn:
+        await conn.execute("""
+            INSERT INTO scoreboard (user_id, count)
+            VALUES ($1, $2)
+            ON CONFLICT (user_id) DO UPDATE
+            SET count = scoreboard.count + $2;
+        """, user_id, amount)
+
+async def get_scoreboard(limit=10):
+    async with db_pool.acquire() as conn:
+        rows = await conn.fetch("""
+            SELECT user_id, count FROM scoreboard
+            ORDER BY count DESC
+            LIMIT $1
+        """, limit)
+        return rows
+
 
 
 # Spotify setup
@@ -142,7 +164,16 @@ tree = bot.tree
 
 @bot.event
 async def on_ready():
-    await tree.sync()
+
+    await init_db()
+     # Lista de servidores donde quieres forzar el sync
+    guild_ids = [597970988587810816]
+
+    for gid in guild_ids:
+        guild = discord.Object(id=gid)
+        await tree.sync(guild=guild)
+        logger.info(f"[DISCORD] Slash commands synced to guild: {gid}")
+
     logger.info(f"[DISCORD] Logged in as {bot.user}")
 
 @bot.event
@@ -167,8 +198,7 @@ async def on_message(message):
 
             sp.playlist_add_items(playlist_id, new_ids, position=0)
             logger.info(f"[SPOTIFY] Added from message: {new_ids}")
-            scoreboard[user_id] = scoreboard.get(user_id, 0) + len(new_ids)
-            save_scoreboard()
+            await increment_score(user_id, len(new_ids))
             await message.channel.send(f"Added {len(new_ids)} track(s).", delete_after=5)
         except Exception as e:
             logger.error(f"[SPOTIFY ERROR] Adding from message: {e}")
@@ -196,7 +226,7 @@ async def sync_command(interaction: discord.Interaction):
         user_id = str(message.author.id)
         new_ids = extract_track_ids_from_text(message.content, existing_ids)
         if new_ids:
-            scoreboard[user_id] = scoreboard.get(user_id, 0) + len(new_ids)
+            await increment_score(user_id, len(new_ids))
         total_new_ids.extend(new_ids)
         existing_ids.update(new_ids)
 
@@ -212,7 +242,6 @@ async def sync_command(interaction: discord.Interaction):
             for track_id in reversed(total_new_ids):
                 sp.playlist_add_items(playlist_id, [track_id], position=0)
 
-            save_scoreboard()
             logger.info(f"[SPOTIFY] Added from history: {total_new_ids}")
             await interaction.followup.send(f"Added {len(total_new_ids)} new track(s) from message history.")
         except Exception as e:
@@ -221,29 +250,18 @@ async def sync_command(interaction: discord.Interaction):
     else:
         await interaction.followup.send("No new tracks found in previous messages.")
 
+# Slash command: /scoreboard
 @tree.command(name="scoreboard", description="Show the user contribution scoreboard.")
 async def scoreboard_command(interaction: discord.Interaction):
-    sorted_scores = sorted(scoreboard.items(), key=lambda x: x[1], reverse=True)
-    if not sorted_scores:
+    rows = await get_scoreboard()
+    if not rows:
         return await interaction.response.send_message("No scores yet.")
 
-    embed = discord.Embed(
-        title="🏆 Leaderboard for Playlist Contributions",
-        color=discord.Color.blurple()
-    )
+    lines = []
+    for rank, row in enumerate(rows, 1):
+        user = await bot.fetch_user(int(row["user_id"]))
+        lines.append(f"#{rank} - {user.mention}: {row['count']} song(s)")
 
-    description = ""
-    for rank, (user_id, count) in enumerate(sorted_scores[:20], 1):
-        try:
-            user = await bot.fetch_user(int(user_id))
-            description += f"**{rank}.** {user.mention} — `{count}` song(s)\n"
-        except:
-            description += f"**{rank}.** Unknown User — `{count}` song(s)\n"
-
-    embed.description = description
-    embed.set_footer(text="Page 1/1")
-
-    await interaction.response.send_message(embed=embed)
-
+    await interaction.response.send_message("🐈 Top Contributors:\n" + "\n".join(lines))
 
 bot.run(DISCORD_TOKEN)
