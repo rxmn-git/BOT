@@ -282,7 +282,7 @@ async def scoreboard_command(interaction: discord.Interaction):
             prefix = f"{i}."
 
         # Línea tipo: 1. @username - 123 songs
-        line = f"{prefix} **@{user.name}** - **{count}** song{'s' if count != 1 else ''}"
+        line = f"{prefix} **@{user.mention}** - **{count}** song{'s' if count != 1 else ''}"
         leaderboard_lines.append(line)
 
     description = "\n".join(leaderboard_lines)
