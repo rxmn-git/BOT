@@ -264,14 +264,12 @@ async def scoreboard_command(interaction: discord.Interaction):
         await interaction.followup.send("No scores found yet.")
         return
 
-    # Limita a top 20
     top_rows = rows[:20]
     leaderboard_lines = []
 
     for i, (user_id, count) in enumerate(top_rows, start=1):
         user = await interaction.client.fetch_user(user_id)
 
-        # Emoji de posición
         if i == 1:
             prefix = "🥇"
         elif i == 2:
@@ -281,14 +279,13 @@ async def scoreboard_command(interaction: discord.Interaction):
         else:
             prefix = f"{i}."
 
-        # Línea tipo: 1. @username - 123 songs
-        line = f"{prefix} **@{user.mention}** - **{count}** song{'s' if count != 1 else ''}"
+        line = f"{prefix} **{user.mention}** - **{count}** song{'s' if count != 1 else ''}"
         leaderboard_lines.append(line)
 
     description = "\n".join(leaderboard_lines)
 
     embed = Embed(
-        title="📊 Leaderboard for Mothership",
+        title="📊 Recommendations leaderboard",
         description=description,
         color=0x5865F2
     )
