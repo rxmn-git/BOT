@@ -27,7 +27,7 @@ SPOTIFY_PLAYLIST_NAME = os.getenv('SPOTIFY_PLAYLIST_NAME')
 CHANNEL_ID = int(os.getenv('CHANNEL_ID'))
 
 # PostgreSQL
-DATABASE_URL = os.getenv("postgresql://postgres:RlLgrpOOFVCRULMgQqiMhHZtSsMMRVST@shortline.proxy.rlwy.net:25650/railway")
+DATABASE_URL = os.getenv("DATABASE_URL")
 db_pool = None
 
 async def init_db():
@@ -40,6 +40,8 @@ async def init_db():
                 count INTEGER NOT NULL
             );
         """)
+        
+logger.info(f"[DB] Connecting to database: {DATABASE_URL}")
 
 async def increment_score(user_id: str, amount: int = 1):
     async with db_pool.acquire() as conn:
