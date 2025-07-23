@@ -7,6 +7,7 @@ import logging
 import json
 import asyncpg
 from dotenv import load_dotenv
+from discord import Embed
 from spotipy.oauth2 import SpotifyOAuth
 from discord.ext import commands
 from discord import app_commands
@@ -40,7 +41,7 @@ async def init_db():
                 count INTEGER NOT NULL
             );
         """)
-        
+
 logger.info(f"[DB] Connecting to database: {DATABASE_URL}")
 
 async def increment_score(user_id: str, amount: int = 1):
@@ -253,17 +254,47 @@ async def sync_command(interaction: discord.Interaction):
         await interaction.followup.send("No new tracks found in previous messages.")
 
 # Slash command: /scoreboard
-@tree.command(name="scoreboard", description="Show the user contribution scoreboard.")
+@tree.command(name="scoreboard", description="Show the leaderboard of shared songs")
 async def scoreboard_command(interaction: discord.Interaction):
+    await interaction.response.defer()
+
     rows = await get_scoreboard()
+
     if not rows:
-        return await interaction.response.send_message("No scores yet.")
+        await interaction.followup.send("No scores found yet.")
+        return
 
-    lines = []
-    for rank, row in enumerate(rows, 1):
-        user = await bot.fetch_user(int(row["user_id"]))
-        lines.append(f"#{rank} - {user.mention}: {row['count']} song(s)")
+    # Limita a top 20
+    top_rows = rows[:20]
+    leaderboard_lines = []
 
-    await interaction.response.send_message("🐈 Top Contributors:\n" + "\n".join(lines))
+    for i, (user_id, count) in enumerate(top_rows, start=1):
+        user = await interaction.client.fetch_user(user_id)
+
+        # Emoji de posición
+        if i == 1:
+            prefix = "🥇"
+        elif i == 2:
+            prefix = "🥈"
+        elif i == 3:
+            prefix = "🥉"
+        else:
+            prefix = f"{i}."
+
+        # Línea tipo: 1. @username - 123 songs
+        line = f"{prefix} **@{user.name}** - **{count}** song{'s' if count != 1 else ''}"
+        leaderboard_lines.append(line)
+
+    description = "\n".join(leaderboard_lines)
+
+    embed = Embed(
+        title="📊 Leaderboard for Mothership",
+        description=description,
+        color=0x5865F2
+    )
+    embed.set_footer(text="Page 1/1")
+
+    await interaction.followup.send(embed=embed)
+
 
 bot.run(DISCORD_TOKEN)
