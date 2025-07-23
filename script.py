@@ -4,6 +4,7 @@ import re
 import discord
 import spotipy
 import logging
+import json
 from dotenv import load_dotenv
 from spotipy.oauth2 import SpotifyOAuth
 from discord.ext import commands
@@ -23,6 +24,20 @@ SPOTIPY_REDIRECT_URI = os.getenv('SPOTIPY_REDIRECT_URI')
 SPOTIFY_USERNAME = os.getenv('SPOTIFY_USERNAME')
 SPOTIFY_PLAYLIST_NAME = os.getenv('SPOTIFY_PLAYLIST_NAME')
 CHANNEL_ID = int(os.getenv('CHANNEL_ID'))
+
+SCOREBOARD_FILE = "scoreboard.json"
+
+# Load scoreboard from file
+if os.path.exists(SCOREBOARD_FILE):
+    with open(SCOREBOARD_FILE, "r") as f:
+        scoreboard = json.load(f)
+else:
+    scoreboard = {}
+
+def save_scoreboard():
+    with open(SCOREBOARD_FILE, "w") as f:
+        json.dump(scoreboard, f)
+
 
 # Spotify setup
 scope = 'playlist-modify-public playlist-modify-private'
@@ -134,7 +149,8 @@ async def on_ready():
 async def on_message(message):
     if message.channel.id != CHANNEL_ID or message.author == bot.user:
         return
-
+    
+    user_id = str(message.author.id)
     existing_ids = get_existing_track_ids(playlist_id)
     new_ids = extract_track_ids_from_text(message.content, existing_ids)
 
@@ -151,6 +167,8 @@ async def on_message(message):
 
             sp.playlist_add_items(playlist_id, new_ids, position=0)
             logger.info(f"[SPOTIFY] Added from message: {new_ids}")
+            scoreboard[user_id] = scoreboard.get(user_id, 0) + len(new_ids)
+            save_scoreboard()
             await message.channel.send(f"Added {len(new_ids)} track(s).", delete_after=5)
         except Exception as e:
             logger.error(f"[SPOTIFY ERROR] Adding from message: {e}")
@@ -175,7 +193,10 @@ async def sync_command(interaction: discord.Interaction):
     total_new_ids = []
 
     async for message in interaction.channel.history(limit=250):
+        user_id = str(message.author.id)
         new_ids = extract_track_ids_from_text(message.content, existing_ids)
+        if new_ids:
+            scoreboard[user_id] = scoreboard.get(user_id, 0) + len(new_ids)
         total_new_ids.extend(new_ids)
         existing_ids.update(new_ids)
 
@@ -191,6 +212,7 @@ async def sync_command(interaction: discord.Interaction):
             for track_id in reversed(total_new_ids):
                 sp.playlist_add_items(playlist_id, [track_id], position=0)
 
+            save_scoreboard()
             logger.info(f"[SPOTIFY] Added from history: {total_new_ids}")
             await interaction.followup.send(f"Added {len(total_new_ids)} new track(s) from message history.")
         except Exception as e:
@@ -198,5 +220,18 @@ async def sync_command(interaction: discord.Interaction):
             await interaction.followup.send("Failed to add tracks from history.")
     else:
         await interaction.followup.send("No new tracks found in previous messages.")
+
+@tree.command(name="scoreboard", description="Show the user contribution scoreboard.")
+async def scoreboard_command(interaction: discord.Interaction):
+    sorted_scores = sorted(scoreboard.items(), key=lambda x: x[1], reverse=True)
+    if not sorted_scores:
+        return await interaction.response.send_message("No scores yet.")
+
+    lines = []
+    for rank, (user_id, count) in enumerate(sorted_scores[:10], 1):
+        user = await bot.fetch_user(int(user_id))
+        lines.append(f"#{rank} - {user.name}: {count} song(s)")
+
+    await interaction.response.send_message("🏆 Top Contributors:\n" + "\n".join(lines))
 
 bot.run(DISCORD_TOKEN)
