@@ -210,48 +210,49 @@ async def on_message(message):
     # Procesar otros eventos de on_message
     await bot.process_commands(message)
 
+
 # Slash command: /playlist
-@tree.command(name="playlist", description="Post the link to the Spotify playlist.")
-async def playlist_command(interaction: discord.Interaction):
-    await interaction.response.send_message(f"🎧 {playlist_url}")
+#@tree.command(name="playlist", description="Post the link to the Spotify playlist.")
+#async def playlist_command(interaction: discord.Interaction):
+#    await interaction.response.send_message(f"🎧 {playlist_url}")
 
 # Slash command: /sync
-@tree.command(name="sync", description="Read past messages and adds the Spotify songs")
-async def sync_command(interaction: discord.Interaction):
-    if interaction.channel.id != CHANNEL_ID:
-        return await interaction.response.send_message("This command can only be used in #music-recs.", ephemeral=True)
+#@tree.command(name="sync", description="Read past messages and adds the Spotify songs")
+#async def sync_command(interaction: discord.Interaction):
+#    if interaction.channel.id != CHANNEL_ID:
+#        return await interaction.response.send_message("This command can only be used in #music-recs.", ephemeral=True)
+#
+ #   await interaction.response.send_message("Reading previous messages...")
+  #  existing_ids = get_existing_track_ids(playlist_id)
+   # total_new_ids = []
 
-    await interaction.response.send_message("Reading previous messages...")
-    existing_ids = get_existing_track_ids(playlist_id)
-    total_new_ids = []
+  #  async for message in interaction.channel.history(limit=250):
+   #     user_id = str(message.author.id)
+    #    new_ids = extract_track_ids_from_text(message.content, existing_ids)
+     #   if new_ids:
+      #      await increment_score(user_id, len(new_ids))
+       # total_new_ids.extend(new_ids)
+    #    existing_ids.update(new_ids)
 
-    async for message in interaction.channel.history(limit=250):
-        user_id = str(message.author.id)
-        new_ids = extract_track_ids_from_text(message.content, existing_ids)
-        if new_ids:
-            await increment_score(user_id, len(new_ids))
-        total_new_ids.extend(new_ids)
-        existing_ids.update(new_ids)
+    #if total_new_ids:
+     #   try:
+      #      results = sp.playlist_items(playlist_id, fields="total", limit=1)
+       #     current_total = results['total']
+        #    total_after_add = current_total + len(total_new_ids)
 
-    if total_new_ids:
-        try:
-            results = sp.playlist_items(playlist_id, fields="total", limit=1)
-            current_total = results['total']
-            total_after_add = current_total + len(total_new_ids)
+         #   if total_after_add > 64:
+          #      trim_playlist(playlist_id, max_size=64 - len(total_new_ids))
 
-            if total_after_add > 64:
-                trim_playlist(playlist_id, max_size=64 - len(total_new_ids))
+           # for track_id in reversed(total_new_ids):
+            #    sp.playlist_add_items(playlist_id, [track_id], position=0)
 
-            for track_id in reversed(total_new_ids):
-                sp.playlist_add_items(playlist_id, [track_id], position=0)
-
-            logger.info(f"[SPOTIFY] Added from history: {total_new_ids}")
-            await interaction.followup.send(f"Added {len(total_new_ids)} new track(s) from message history.")
-        except Exception as e:
-            logger.error(f"[SPOTIFY ERROR] Adding from history: {e}")
-            await interaction.followup.send("Failed to add tracks from history.")
-    else:
-        await interaction.followup.send("No new tracks found in previous messages.")
+            #logger.info(f"[SPOTIFY] Added from history: {total_new_ids}")
+            #await interaction.followup.send(f"Added {len(total_new_ids)} new track(s) from message history.")
+        #except Exception as e:
+        #    logger.error(f"[SPOTIFY ERROR] Adding from history: {e}")
+         #   await interaction.followup.send("Failed to add tracks from history.")
+    #else:
+     #   await interaction.followup.send("No new tracks found in previous messages.")
 
 # Slash command: /scoreboard
 @tree.command(name="scoreboard", description="Show the leaderboard of shared songs")
